@@ -1,4 +1,4 @@
-# ===== Project name =====
+# ===== Project =====
 TARGET := gloc
 
 # ===== Directories =====
@@ -12,15 +12,16 @@ CXX := g++
 CC  := gcc
 
 # ===== Flags =====
-CXXFLAGS := -Wall -Wextra -std=c++17 -I$(INC_DIR)
-CFLAGS   := -Wall -Wextra -I$(INC_DIR)
+CXXFLAGS := -Wall -Wextra -std=c++17 -I$(INC_DIR) -MMD -MP
+CFLAGS   := -Wall -Wextra -I$(INC_DIR) -MMD -MP
 
-# Debug vs Release
+LDFLAGS :=
+
+# ===== Build mode =====
+MODE ?= debug
+
 DEBUG_FLAGS := -g
 RELEASE_FLAGS := -O2
-
-# Default build mode
-MODE ?= debug
 
 ifeq ($(MODE),debug)
 	CXXFLAGS += $(DEBUG_FLAGS)
@@ -30,7 +31,7 @@ else
 	CFLAGS   += $(RELEASE_FLAGS)
 endif
 
-# ===== Source files =====
+# ===== Sources =====
 CPP_SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 C_SRCS   := $(wildcard $(SRC_DIR)/*.c)
 
@@ -39,41 +40,46 @@ C_OBJS   := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(C_SRCS))
 
 OBJS := $(CPP_OBJS) $(C_OBJS)
 
-# ===== Targets =====
+DEPS := $(OBJS:.o=.d)
+
+# ===== Default target =====
 all: $(BIN_DIR)/$(TARGET)
 
-# Link step
+# ===== Link =====
 $(BIN_DIR)/$(TARGET): $(OBJS) | $(BIN_DIR)
-	$(CXX) $(OBJS) -o $@
+	$(CXX) $(OBJS) $(LDFLAGS) -o $@
 
-# Compile C++ files
+# ===== Compile C++ =====
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Compile C files
+# ===== Compile C =====
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Create directories if missing
+# ===== Create dirs if missing =====
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-# Clean build artifacts
+# ===== Utility targets =====
 clean:
 	rm -rf $(BUILD_DIR) $(BIN_DIR)
 
-# Rebuild
 rebuild: clean all
 
-# Debug build explicitly
+run: all
+	./$(BIN_DIR)/$(TARGET)
+
 debug:
 	$(MAKE) MODE=debug
 
-# Release build explicitly
 release:
 	$(MAKE) MODE=release
 
-.PHONY: all clean rebuild debug release
+# ===== Include header deps =====
+-include $(DEPS)
+
+.PHONY: all clean rebuild run debug release
