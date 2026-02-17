@@ -8,29 +8,32 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
-#include <string>
 
 namespace fs = std::filesystem;
 
 // In-memory inverted index
 static std::unordered_map<std::string, std::vector<int>> inverted_index;
 
-static void index_file(const std::string& filepath, int docID) {
-    std::ifstream file(filepath);
-    if (!file.is_open()) return;
+// Index a single file
+static void index_file(const std::string& path, int docID) {
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        std::cerr << "Failed to open: " << path << "\n";
+        return;
+    }
 
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(in, line)) {
         auto tokens = tokenize(line);
         for (const auto& word : tokens) {
             auto& posting = inverted_index[word];
-            if (posting.empty() || posting.back() != docID) {
+            if (posting.empty() || posting.back() != docID)
                 posting.push_back(docID);
-            }
         }
     }
 }
 
+// Build index for a root directory
 void build_index(const std::string& root) {
     int docID = 0;
 
@@ -39,15 +42,16 @@ void build_index(const std::string& root) {
 
         std::string path = entry.path().string();
         docmap_add(docID, path);
+
         index_file(path, docID);
 
-        std::cout << "Indexed [" << docID << "]: " << path << "\n";
+        std::cout << "Indexed [" << docID << "] " << path << "\n";
         docID++;
     }
 
-    // Write inverted index to disk
-    for (auto& [word, postings] : inverted_index) {
-        long offset = storage_append_postings(postings.data(), postings.size());
+    // Write inverted index to disk via storage.c
+    for (auto& [word, posting] : inverted_index) {
+        long offset = storage_append_postings(posting.data(), posting.size());
         storage_add_term(word.c_str(), offset);
     }
 
