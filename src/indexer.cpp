@@ -8,22 +8,20 @@
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <string>
 
 namespace fs = std::filesystem;
 
-// In-memory inverted index
 static std::unordered_map<std::string, std::vector<int>> inverted_index;
 
-// Index a single file
-static void index_file(const std::string& path, int docID) {
-    std::ifstream in(path);
-    if (!in.is_open()) {
-        std::cerr << "Failed to open: " << path << "\n";
+static void index_file(const std::string& filepath, int docID) {
+    std::ifstream file(filepath);
+    if (!file.is_open()) {
+        std::cerr << "[INDEXER] Failed to open: " << filepath << "\n";
         return;
     }
-
     std::string line;
-    while (std::getline(in, line)) {
+    while (std::getline(file, line)) {
         auto tokens = tokenize(line);
         for (const auto& word : tokens) {
             auto& posting = inverted_index[word];
@@ -33,28 +31,30 @@ static void index_file(const std::string& path, int docID) {
     }
 }
 
-// Build index for a root directory
-void build_index(const std::string& root) {
-    int docID = 0;
+static void save_index_to_disk() {
+    for (const auto& pr : inverted_index) {
+        const std::string& term = pr.first;
+        const auto& postings = pr.second;
+        long offset = storage_append_postings(postings.data(), postings.size());
+        storage_add_term(term.c_str(), offset, postings.size());
+    }
+    storage_save_dictionary();
+}
 
+void index_directory(const std::string& root) {
+    init_files();
+
+    int docID = 0;
     for (const auto& entry : fs::recursive_directory_iterator(root)) {
         if (!entry.is_regular_file()) continue;
-
         std::string path = entry.path().string();
         docmap_add(docID, path);
-
         index_file(path, docID);
-
-        std::cout << "Indexed [" << docID << "] " << path << "\n";
+        std::cout << "[INDEXER] Indexed [" << docID << "]: " << path << "\n";
         docID++;
     }
 
-    // Write inverted index to disk via storage.c
-    for (auto& [word, posting] : inverted_index) {
-        long offset = storage_append_postings(posting.data(), posting.size());
-        storage_add_term(word.c_str(), offset);
-    }
-
-    storage_save_dictionary();
-    std::cout << "Indexing complete. Terms saved to disk.\n";
+    save_index_to_disk();
+    std::cout << "=== Indexing complete ===\n";
+    std::cout << "Unique terms: " << inverted_index.size() << "\n";
 }

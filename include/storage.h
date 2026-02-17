@@ -1,29 +1,39 @@
-#ifndef STORAGE_H
-#define STORAGE_H
+#pragma once
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// Append a posting list to postings.bin
-// Returns the file offset where this list starts
-long storage_append_postings(int* docIDs, int count);
+#define PATH_MAX 4096
 
-// Find the file offset of a term
-long storage_find_offset(const char* word);
+typedef struct dict_entry {
+    char term[64];
+    long offset;
+    int count;
+} dict_entry_t;
 
-// Load postings from an offset
-// Returns a dynamically allocated array of docIDs and sets count
-int* storage_load_postings(long offset, int* count);
+// initialize file paths
+void init_files();
 
-// Save/load dictionary to/from disk
+// append postings to postings.bin, return file offset
+long storage_append_postings(const int* docIDs, int count);
+
+// add dictionary entry (term + offset + count)
+void storage_add_term(const char* term, long offset, int count);
+
+// save dictionary to disk
 void storage_save_dictionary();
-void storage_load_dictionary();
-// Add a term → offset mapping (used during indexing)
-void storage_add_term(const char* term, long offset);
+
+// load dictionary from disk
+dict_entry_t* storage_load_dictionary(int* out_count);
+
+// find dictionary offset of a term, or -1 if not found
+long storage_find_offset(const char* term);
+
+// load postings from offset
+int* storage_load_postings(long offset, int* out_count);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif // STORAGE_H

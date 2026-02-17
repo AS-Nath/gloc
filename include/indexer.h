@@ -1,8 +1,4 @@
-#ifndef INDEXER_H
-#define INDEXER_H
-
+#pragma once
 #include <string>
 
 void index_directory(const std::string& root);
-
-#endif
